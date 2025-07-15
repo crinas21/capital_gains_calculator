@@ -29,6 +29,11 @@ def parse_args():
         help="Financial year end year (e.g. 2023 for FY2022-23; defaults to current year)"
     )
     p.add_argument(
+        "--splits",
+        default="stock_splits.csv",
+        help="CSV file with stock splits (format: Date,Ticker,Ratio)"
+    )
+    p.add_argument(
         "--output",
         default="gains.csv",
         help="Output CSV for per-sale gains (default: %(default)s)"
@@ -36,31 +41,26 @@ def parse_args():
     return p.parse_args()
 
 
-def get_stock_splits():
-    splits = {} # ticker: [{split_date, ratio}, {}, ...]
-    print("Enter stock splits (press Enter to skip):")
-    while True:
-        ticker = input("Ticker (e.g. AAPL:US): ").strip()
-        if not ticker:
-            break
-        date_str = input(f"Split date for {ticker} (YYYY-MM-DD): ").strip()
-        ratio_str = input(f"Split ratio (e.g. 2 for 2-for-1, 0.1 for 1-for-10): ").strip()
+def load_stock_splits(split_file):
+    if not split_file:
+        return {}
+    try:
+        splits_df = pd.read_csv(split_file, index_col=False)
+        splits_df['Date'] = pd.to_datetime(splits_df['Date'])
+    except Exception as e:
+        print(f"Error reading stock splits file: {e}")
+        return {}
 
-        try:
-            split_date = pd.to_datetime(date_str)
-            ratio = float(ratio_str)
-            if ratio <= 0:
-                raise ValueError
-        except:
-            print("Invalid input, try again.")
-            continue
-
+    splits = {}
+    for _, row in splits_df.iterrows():
+        ticker = row['Ticker']
         if ticker not in splits:
             splits[ticker] = []
-        splits[ticker].append({'date': split_date, 'ratio': ratio})
-        print(f"Registered split for {ticker}: {ratio}-for-1 on {split_date.date()}")
+        splits[ticker].append({
+            'date': row['Date'],
+            'ratio': float(row['Ratio'])
+        })
     return splits
-
 
 
 def calc_fees(df_row):
@@ -94,7 +94,7 @@ def main():
     buys_df.sort_values(DATE_COL, inplace=True)
 
     # Get stock splits from user
-    splits = get_stock_splits()
+    splits = load_stock_splits(args.splits)
 
     # Build FIFO queues of buys - assume no buy fees
     fifo_queues = {} # ticker: [{buy_date, buy_qty, buy_price}, {} ,...]
