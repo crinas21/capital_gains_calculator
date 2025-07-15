@@ -10,6 +10,7 @@ PRICE_COL = 'Price'
 QUANTITY_COL = 'Quantity'
 CONSIDERATION_COL = 'Consideration'
 FEE_COLS = ['Brokerage', 'GST', 'Stampduty', 'Application Fee', 'OtherCharge', 'Fee']
+APPLY_CGT_DISCOUNT = True
 
 
 def parse_args():
@@ -145,6 +146,11 @@ def main():
             used_qty = min(sell_qty, buy['qty'])
             gain = (sell_price - buy['price']) * used_qty
 
+            # Check if asset was held for at least 12 months to apply CGT discount
+            held_days = (sell_date - buy['date']).days
+            eligible_for_discount = held_days >= 365 and gain > 0
+            discounted_gain = gain * 0.5 if eligible_for_discount and APPLY_CGT_DISCOUNT else gain
+
             gain_rows.append({
                 'Ticker': ticker,
                 'Sell Date': sell_date,
@@ -153,18 +159,25 @@ def main():
                 'Buy Price': buy['price'],
                 'Quantity': used_qty,
                 'Gain': gain,
+                'Discounted Gain': discounted_gain
             })
 
             sell_qty -= used_qty
             buy['qty'] -= used_qty
             if buy['qty'] == 0:
                 fifo_queues[ticker].popleft()
+    
+    if not gain_rows:
+        print("No capital gains to report in the specified financial year.")
+        return
 
     # Output to CSV
     gains_df = pd.DataFrame(gain_rows)
+    gains_df.sort_values("Sell Date", inplace=True, ascending=False)
     gains_df.to_csv(args.output, index=False)
-    print(f"Total capital gain: ${gains_df['Gain'].sum():,.2f}")
-    print(f"Total net capital gain (minus fees): ${gains_df['Gain'].sum() - total_fees:,.2f}")
+
+    print(f"Total capital gain: ${gains_df[gains_df['Gain'] > 0]['Gain'].sum():,.2f}") # Exclude losses, fees and CGT discount
+    print(f"Net capital gain: ${gains_df['Discounted Gain'].sum() - total_fees:,.2f}")
     print(f"Saved capital gains to {args.output}")
     
 

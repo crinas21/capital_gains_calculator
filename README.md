@@ -17,6 +17,8 @@ The result is written to a CSV file with detailed per-lot gain calculations.
 - Handles **multiple stock splits**, including **reverse splits**
 - Includes **brokerage and related fees**
 - Outputs per-sale details and total capital gain
+- Applies 50% CGT discount for assets held longer than 12 months
+- Ignores capital losses when reporting total gains
 
 ---
 
@@ -68,13 +70,14 @@ python3 calculate_capital_gains.py <trades-csv> --fy-end <end-fy> --splits <stoc
 
 The output CSV includes one row per matched sale:
 
-| Ticker | Sell Date | Sell Price | Buy Date | Buy Price | Quantity | Gain |
-|--------|-----------|------------|----------|-----------|----------|------|
+| Ticker | Sell Date | Sell Price | Buy Date | Buy Price | Quantity | Gain | Discounted Gain |
+|--------|-----------|------------|----------|-----------|----------|------|-----------------|
 
 The script also prints:
 
-- **Total gross capital gain**
-- **Total net capital gain** (after subtracting fees)
+- **Total capital gain** (excluding losses, fees, and CGT discount)
+- **Total net capital gain** (after subtracting fees and applying CGT discount)
+
 
 ---
 
